@@ -1,0 +1,224 @@
+RESOURCE_GROUP=gcp-migration-poc
+LOCATION=centralus
+CLASSIC_VPN_VNET_NAME=migration-vnet
+CLASSIC_VPN_VNET_ADDRESS_PREFIX=10.20.0.0/16
+CLASSIC_VPN_VM_SUBNET_NAME=vm-subnet
+CLASSIC_VPN_VM_SUBNET_ADDRESS_PREFIX=10.20.0.0/24
+CLASSIC_VPN_MIGRATION_NSG=migration-nsg
+CLASSIC_VPN_MIGRATION_NSG_ALLOW_SSH=migration-nsg-allow-ssh
+CLASSIC_VPN_MIGRATION_NSG_ALLOW_HTTPS=migration-nsg-allow-https
+CLASSIC_VPN_MIGRATION_NSG_ALLOW_GCP_IP0=migration-nsg-gcp-allow-ip0
+CLASSIC_VPN_GATEWAY_SUBNET_NAME=GatewaySubnet
+CLASSIC_VPN_GATEWAY_SUBNET_ADDRESS_PREFIX=10.20.1.0/24
+CLASSIC_GATEWAY_PUBLIC_IP1=azure-gcp-vpn-gw-pub-ip-1
+CLASSIC_GATEWAY_PUBLIC_IP2=azure-gcp-vpn-gw-pub-ip-2
+CLASSIC_AZURE_VPN_GATEWAY_NAME=azure-gcp-vpn-gw
+CLASSIC_LOCAL_GATEWAY_NAME=azure-gcp-local-vpn-gw
+CLASSIC_VPN_CONNECTIN_NAME=azure-gcp-vpn-conn
+CLASSIC_GCP_VPN_GATEWAY_IP=
+
+HA_VPN_VNET_NAME=ha-migration-vnet
+HA_VPN_VNET_ADDRESS_PREFIX=10.21.0.0/16
+HA_VPN_VM_SUBNET_NAME=ha-vm-subnet
+HA_VPN_VM_SUBNET_ADDRESS_PREFIX=10.21.0.0/24
+HA_VPN_MIGRATION_NSG=ha-migration-nsg
+HA_VPN_MIGRATION_NSG_ALLOW_SSH=ha-migration-nsg-allow-ssh
+HA_VPN_MIGRATION_NSG_ALLOW_HTTPS=ha-migration-nsg-allow-https
+HA_VPN_MIGRATION_NSG_ALLOW_GCP_IP0=ha-migration-nsg-gcp-allow-ip0
+HA_VPN_GATEWAY_SUBNET_NAME=GatewaySubnet
+HA_VPN_GATEWAY_SUBNET_ADDRESS_PREFIX=10.21.1.0/24
+HA_GATEWAY_PUBLIC_IP1=azure-gcp-ha-vpn-gw-pub-ip-1
+HA_GATEWAY_PUBLIC_IP2=azure-gcp-ha-vpn-gw-pub-ip-2
+HA_AZURE_VPN_GATEWAY_NAME=azure-gcp-ha-vpn-gw
+HA_LOCAL_GATEWAY_NAME0=azure-gcp-local-ha-vpn-gw0
+HA_LOCAL_GATEWAY_NAME1=azure-gcp-local-ha-vpn-gw1
+HA_GCP_VPN_GATEWAY_IP0=
+HA_GCP_VPN_GATEWAY_IP1=
+HA_VPN_CONNECTIN_NAME0=azure-gcp-vpn-conn0
+HA_VPN_CONNECTIN_NAME1=azure-gcp-vpn-conn1
+HA_VPN_GCP_BGP_PERING_ADDRESS0=169.254.21.2
+HA_VPN_GCP_BGP_PERING_ADDRESS1=169.254.22.2
+HA_VPN_GCP_ASN=65514
+
+
+GATEWAY_TYPE=Vpn
+GATEWAY_SKU=VpnGw2
+GATEWAY_GENERATION=Generation2
+VPN_TYPE=RouteBased
+GCP_SUBNET_IP=10.0.0.0/24
+SHARED_SECRET=z2e4LGcANtfvADzAlRpRxxBrsoocYvRj
+MIGRATION_SOURCE_VM_NAME=migration-source-vm
+MIGRATION_SOURCE_VM_NAME1=migration-source-vm1
+
+az login
+az account subscription list
+
+#CLASSIC VPN Network
+========================
+az network vnet list -g $RESOURCE_GROUP -o table
+
+az network vnet create -n $CLASSIC_VPN_VNET_NAME --address-prefixes $CLASSIC_VPN_VNET_ADDRESS_PREFIX -g $RESOURCE_GROUP
+#az network vnet delete -n $CLASSIC_VPN_VNET_NAME -g $RESOURCE_GROUP
+
+az network vnet subnet create -n $CLASSIC_VPN_VM_SUBNET_NAME --address-prefixes $CLASSIC_VPN_VM_SUBNET_ADDRESS_PREFIX \
+--vnet-name $CLASSIC_VPN_VNET_NAME -g $RESOURCE_GROUP
+#az network vnet subnet delete -n $CLASSIC_VPN_VM_SUBNET_NAME --vnet-name $CLASSIC_VPN_VNET_NAME -g $RESOURCE_GROUP
+
+az network vnet subnet create -n $CLASSIC_VPN_GATEWAY_SUBNET_NAME --address-prefixes $CLASSIC_VPN_GATEWAY_SUBNET_ADDRESS_PREFIX \
+--vnet-name $CLASSIC_VPN_VNET_NAME -g $RESOURCE_GROUP
+#az network vnet subnet delete -n $CLASSIC_VPN_GATEWAY_SUBNET_NAME --vnet-name $CLASSIC_VPN_VNET_NAME -g $RESOURCE_GROUP
+
+az network nsg create -n $CLASSIC_VPN_MIGRATION_NSG -g $RESOURCE_GROUP
+
+az network nsg rule create --name $CLASSIC_VPN_MIGRATION_NSG_ALLOW_SSH --nsg-name $CLASSIC_VPN_MIGRATION_NSG \
+--source-address-prefixes "*" --source-port-ranges "*" \
+--destination-address-prefixes $CLASSIC_VPN_VM_SUBNET_ADDRESS_PREFIX --destination-port-ranges 22 \
+--priority 100 --direction Inbound --access Allow --protocol TCP -g $RESOURCE_GROUP
+#az network nsg rule delete --name $CLASSIC_VPN_MIGRATION_NSG_ALLOW_SSH --nsg-name $CLASSIC_VPN_MIGRATION_NSG -g $RESOURCE_GROUP
+
+az network nsg rule create --name $CLASSIC_VPN_MIGRATION_NSG_ALLOW_HTTPS --nsg-name $CLASSIC_VPN_MIGRATION_NSG \
+--source-address-prefixes "*" --source-port-ranges "*" \
+--destination-address-prefixes $CLASSIC_VPN_VM_SUBNET_ADDRESS_PREFIX --destination-port-ranges 80 443 \
+--priority 101 --direction Inbound --access Allow --protocol TCP -g $RESOURCE_GROUP
+#az network nsg rule delete --name $CLASSIC_VPN_MIGRATION_NSG_ALLOW_HTTPS --nsg-name $CLASSIC_VPN_MIGRATION_NSG -g $RESOURCE_GROUP
+
+az network nsg rule create --name $CLASSIC_VPN_MIGRATION_NSG_ALLOW_GCP_IP0 --nsg-name $CLASSIC_VPN_MIGRATION_NSG \
+--source-address-prefixes $GCP_SUBNET_IP --source-port-ranges "*" \
+--destination-address-prefixes $CLASSIC_VPN_VM_SUBNET_ADDRESS_PREFIX --destination-port-ranges "*" \
+--priority 102 --direction Inbound --access Allow -g $RESOURCE_GROUP
+#az network nsg rule delete --name $CLASSIC_VPN_MIGRATION_NSG_ALLOW_GCP_IP0 --nsg-name $CLASSIC_VPN_MIGRATION_NSG -g $RESOURCE_GROUP
+
+#CLASSIC VPN Gateway
+====================================
+az network public-ip create -n $CLASSIC_GATEWAY_PUBLIC_IP1 --version IPv4 --sku Standard -g $RESOURCE_GROUP
+#az network public-ip create -n $CLASSIC_GATEWAY_PUBLIC_IP1 -g $RESOURCE_GROUP
+
+az network public-ip create -n $CLASSIC_GATEWAY_PUBLIC_IP2 --version IPv4 --sku Standard -g $RESOURCE_GROUP
+#az network public-ip create -n $CLASSIC_GATEWAY_PUBLIC_IP2 -g $RESOURCE_GROUP
+
+az network vnet-gateway create -n $CLASSIC_AZURE_VPN_GATEWAY_NAME --vnet $CLASSIC_VPN_VNET_NAME --gateway-type $GATEWAY_TYPE \
+--vpn-type $VPN_TYPE --sku $GATEWAY_SKU --vpn-gateway-generation $GATEWAY_GENERATION \
+--public-ip-address $CLASSIC_GATEWAY_PUBLIC_IP1 $CLASSIC_GATEWAY_PUBLIC_IP2 -g $RESOURCE_GROUP
+
+az network vnet-gateway list -g $RESOURCE_GROUP
+#az network vnet-gateway delete -n $CLASSIC_AZURE_VPN_GATEWAY_NAME -g $RESOURCE_GROUP
+
+az network local-gateway create -n $CLASSIC_LOCAL_GATEWAY_NAME --local-address-prefixes $GCP_SUBNET_IP \
+--gateway-ip-address $CLASSIC_GCP_VPN_GATEWAY_IP -g $RESOURCE_GROUP
+
+az network vpn-connection create --name $CLASSIC_VPN_CONNECTIN_NAME -g $RESOURCE_GROUP \
+--vnet-gateway1 $CLASSIC_AZURE_VPN_GATEWAY_NAME --local-gateway2 $CLASSIC_LOCAL_GATEWAY_NAME --shared-key $SHARED_SECRET
+
+az vm create -g $RESOURCE_GROUP -n $MIGRATION_SOURCE_VM_NAME --image Ubuntu2204 \
+--admin-username azureuser --admin-password P@ssword@2025 --vnet-name $CLASSIC_VPN_VNET_NAME --subnet $CLASSIC_VPN_VM_SUBNET_NAME \
+--authentication-type password --generate-ssh-keys --size Standard_D2s_v3 --location $LOCATION
+
+az ssh vm --local-user azureuser -g $RESOURCE_GROUP -n $MIGRATION_SOURCE_VM_NAME
+
+#HA VPN Network
+========================
+az network vnet list -g $RESOURCE_GROUP -o table
+
+az network vnet create -n $HA_VPN_VNET_NAME --address-prefixes $HA_VPN_VNET_ADDRESS_PREFIX -g $RESOURCE_GROUP
+#az network vnet delete -n $HA_VPN_VNET_NAME -g $RESOURCE_GROUP
+
+az network vnet subnet create -n $HA_VPN_VM_SUBNET_NAME --address-prefixes $HA_VPN_VM_SUBNET_ADDRESS_PREFIX \
+--vnet-name $HA_VPN_VNET_NAME -g $RESOURCE_GROUP
+#az network vnet subnet delete -n $HA_VPN_VM_SUBNET_NAME --vnet-name $HA_VPN_VNET_NAME -g $RESOURCE_GROUP
+
+az network vnet subnet create -n $HA_VPN_GATEWAY_SUBNET_NAME --address-prefixes $HA_VPN_GATEWAY_SUBNET_ADDRESS_PREFIX \
+--vnet-name $HA_VPN_VNET_NAME -g $RESOURCE_GROUP
+#az network vnet subnet delete -n $HA_VPN_GATEWAY_SUBNET_NAME --vnet-name $HA_VPN_VNET_NAME -g $RESOURCE_GROUP
+
+az network nsg create -n $HA_VPN_MIGRATION_NSG -g $RESOURCE_GROUP
+
+az network nsg rule create --name $HA_VPN_MIGRATION_NSG_ALLOW_SSH --nsg-name $HA_VPN_MIGRATION_NSG \
+--source-address-prefixes "*" --source-port-ranges "*" \
+--destination-address-prefixes $HA_VPN_VM_SUBNET_ADDRESS_PREFIX --destination-port-ranges 22 \
+--priority 100 --direction Inbound --access Allow --protocol TCP -g $RESOURCE_GROUP
+#az network nsg rule delete --name $HA_VPN_MIGRATION_NSG_ALLOW_SSH --nsg-name $HA_VPN_MIGRATION_NSG -g $RESOURCE_GROUP
+
+az network nsg rule create --name $HA_VPN_MIGRATION_NSG_ALLOW_HTTPS --nsg-name $HA_VPN_MIGRATION_NSG \
+--source-address-prefixes "*" --source-port-ranges "*" \
+--destination-address-prefixes $HA_VPN_VM_SUBNET_ADDRESS_PREFIX --destination-port-ranges 80 443 \
+--priority 101 --direction Inbound --access Allow --protocol TCP -g $RESOURCE_GROUP
+#az network nsg rule delete --name $HA_VPN_MIGRATION_NSG_ALLOW_HTTPS --nsg-name $HA_VPN_MIGRATION_NSG -g $RESOURCE_GROUP
+
+az network nsg rule create --name $HA_VPN_MIGRATION_NSG_ALLOW_GCP_IP0 --nsg-name $HA_VPN_MIGRATION_NSG \
+--source-address-prefixes $GCP_SUBNET_IP --source-port-ranges "*" \
+--destination-address-prefixes $HA_VPN_VM_SUBNET_ADDRESS_PREFIX --destination-port-ranges "*" \
+--priority 102 --direction Inbound --access Allow -g $RESOURCE_GROUP
+#az network nsg rule delete --name $HA_VPN_MIGRATION_NSG_ALLOW_GCP_IP0 --nsg-name $HA_VPN_MIGRATION_NSG -g $RESOURCE_GROUP
+
+#HA VPN Gateway
+====================================
+az network public-ip create -n $HA_GATEWAY_PUBLIC_IP1 --version IPv4 --sku Standard -g $RESOURCE_GROUP
+#az network public-ip create -n $HA_GATEWAY_PUBLIC_IP1 -g $RESOURCE_GROUP
+
+az network public-ip create -n $HA_GATEWAY_PUBLIC_IP2 --version IPv4 --sku Standard -g $RESOURCE_GROUP
+#az network public-ip create -n $HA_GATEWAY_PUBLIC_IP2 -g $RESOURCE_GROUP
+
+az network vnet-gateway create -n $HA_AZURE_VPN_GATEWAY_NAME --vnet $HA_VPN_VNET_NAME --gateway-type $GATEWAY_TYPE \
+--vpn-type $VPN_TYPE --sku $GATEWAY_SKU --vpn-gateway-generation $GATEWAY_GENERATION \
+--public-ip-address $HA_GATEWAY_PUBLIC_IP1 $HA_GATEWAY_PUBLIC_IP2 -g $RESOURCE_GROUP
+
+az network vnet-gateway list -g $RESOURCE_GROUP -o table
+#az network vnet-gateway delete -n $HA_AZURE_VPN_GATEWAY_NAME -g $RESOURCE_GROUP
+
+az network local-gateway create -n $HA_LOCAL_GATEWAY_NAME0 --local-address-prefixes $GCP_SUBNET_IP \
+--gateway-ip-address $HA_GCP_VPN_GATEWAY_IP0 --asn $HA_VPN_GCP_ASN --bgp-peering-address $HA_VPN_GCP_BGP_PERING_ADDRESS0  -g $RESOURCE_GROUP
+
+az network vpn-connection create --name $HA_VPN_CONNECTIN_NAME0 -g $RESOURCE_GROUP \
+--vnet-gateway1 $HA_AZURE_VPN_GATEWAY_NAME --local-gateway2 $HA_LOCAL_GATEWAY_NAME0 --shared-key $SHARED_SECRET --enable-bgp true
+
+az network local-gateway create -n $HA_LOCAL_GATEWAY_NAME1 --local-address-prefixes $GCP_SUBNET_IP \
+--gateway-ip-address $HA_GCP_VPN_GATEWAY_IP1 --asn $HA_VPN_GCP_ASN --bgp-peering-address $HA_VPN_GCP_BGP_PERING_ADDRESS1 -g $RESOURCE_GROUP
+
+az network vpn-connection create --name $HA_VPN_CONNECTIN_NAME1 -g $RESOURCE_GROUP \
+--vnet-gateway1 $HA_AZURE_VPN_GATEWAY_NAME --local-gateway2 $HA_LOCAL_GATEWAY_NAME1 --shared-key $SHARED_SECRET --enable-bgp true
+
+
+az vm create -g $RESOURCE_GROUP -n $MIGRATION_SOURCE_VM_NAME1 --image Ubuntu2204 \
+--admin-username azureuser --admin-password P@ssword@2025 --vnet-name $HA_VPN_VNET_NAME --subnet $HA_VPN_VM_SUBNET_NAME \
+--authentication-type password --generate-ssh-keys --size Standard_D2s_v3 --location $LOCATION
+
+az ssh vm --local-user azureuser -g $RESOURCE_GROUP -n $MIGRATION_SOURCE_VM_NAME1
+
+#Storage Transfer of Filesystem from Azure to GCP
+=================================================
+#Setup Source VM
+==================
+az ssh vm --local-user azureuser -g $RESOURCE_GROUP -n $MIGRATION_SOURCE_VM_NAME
+AZURE_AGENT_POOL=azure-gcp-pool
+
+#Install gcloud sdk
+====================
+sudo apt-get update
+sudo apt-get install apt-transport-https ca-certificates gnupg curl
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+sudo apt-get update && sudo apt-get install google-cloud-cli
+gcloud init
+
+#Install Docker
+==================
+sudo apt-get update
+sudo apt-get install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+# Add the repository to Apt sources:
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo docker run hello-world
+sudo usermod -aG docker $USER
+sudo systemctl restart docker
+
+#Install Transfer Agent
+=================================
+gcloud transfer agents install --pool=$AZURE_AGENT_POOL --count=1 --mount-directories=/home/azureuser/azgcpfs
