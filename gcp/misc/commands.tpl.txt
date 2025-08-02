@@ -1,0 +1,261 @@
+BASEFOLDERPATH=
+HELPERSRPATH=
+PROJECT_ID=
+PROJECT_NUMBER=
+OWNER=
+GSA=
+GSA_DISPLAY_NAME=
+REGION=
+VPC_NAME=
+MIGRATION_SUBNET=
+TEST_VPN_VM=test-vpn-vm
+CLASSIC_VPN_GATEWAY_NAME=gcp-azure-classic-vpn-gw
+CLASSIC_VPN_GATEWAY_IP_NAME=gcp-azure-vpn-gw-pub-ip
+CLASSIC_TUNNEL_NAME_IF0=gcp-azure-vpn-tnl0
+CLASSIC_TUNNEL_ROUTE0=gcp-azure-vpn-tnl-rt0
+AZURE_GW_IP_0=
+AZURE_GW_IP_1=
+AZURE_SUBNET_IP_RANGE0=
+
+HA_VPN_GATEWAY_NAME=gcp-azure-ha-vpn-gw
+HA_VPN_TUNNEL_NAME_IF0=gcp-azure-ha-vpn-tnl0
+HA_VPN_TUNNEL_NAME_IF1=gcp-azure-ha-vpn-tnl1
+HA_VPN_ROUTER_NAME=gcp-azure-rtr
+HA_VPN_ROUTER_NAME_TUNNEL0=gcp-azure-ha-vpn-tnl-rtr0
+HA_VPN_ROUTER_NAME_TUNNEL1=gcp-azure-ha-vpn-tnl-rtr1
+HA_VPN_BGP_PEER_NAME_0=gcp-azure-ha-vpn-bgp0
+HA_VPN_BGP_PEER_NAME_1=gcp-azure-ha-vpn-bgp1
+HA_VPN_GOOGLE_ASN=65514
+HA_VPN_GOOGLE_BGP_IP_0=169.254.21.2
+HA_VPN_GOOGLE_BGP_IP_1=169.254.22.2
+HA_VPN_AZURE_GW_NAME=azure-gcp-ha-vpn-gw
+HA_VPN_AZURE_GW_IP_0=
+HA_VPN_AZURE_GW_IP_1=
+HA_VPN_AZURE_BGP_PERING_ADDRESS0=169.254.21.1
+HA_VPN_AZURE_BGP_PERING_ADDRESS1=169.254.22.1
+HA_VPN_AZURE_ASN=65515
+
+IKE_VERS=2
+SHARED_SECRET=z2e4LGcANtfvADzAlRpRxxBrsoocYvRj
+MASK_LENGTH=30
+
+AZURE_AGENT_POOL=azure-gcp-pool
+GCP_AGENT_POOL=azure-gcp-dest-pool
+AZURE_GCP_FS_TRANSFER=transferjobs/<unique-name>
+
+
+gcloud auth login
+gcloud auth list
+gcloud config set account $OWNER
+gcloud services enable cloudresourcemanager.googleapis.com
+
+gcloud config set project $PROJECT_ID
+#gcloud auth application-default login
+
+gcloud config set compute/region $REGION
+gcloud config set compute/zone $REGION-a
+
+gcloud iam service-accounts list
+gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$GSA --role=roles/owner
+gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$GSA --role=roles/iam.serviceAccountUser
+gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$GSA --role=roles/iam.serviceAccountTokenCreator
+
+gcloud iam service-accounts keys create $HELPERSRPATH/$GSA_DISPLAY_NAME.json --iam-account=$GSA
+gcloud auth activate-service-account $GSA --key-file=$HELPERSRPATH/$GSA_DISPLAY_NAME.json
+#gcloud config set account $GSA
+gcloud auth list
+
+gcloud config set project $PROJECT_ID
+gcloud config set compute/region $REGION
+gcloud config set compute/zone $REGION-a
+
+Network
+====================================
+gcloud compute networks create $VPC_NAME --subnet-mode=custom --bgp-routing-mode=regional --mtu=1460
+#gcloud compute networks delete $VPC_NAME
+
+gcloud compute networks subnets create $MIGRATION_SUBNET --network=$VPC_NAME \
+--range=10.0.0.0/24 
+#gcloud compute networks subnets delete $MIGRATION_SUBNET
+
+gcloud compute networks subnets list --network=$VPC_NAME
+
+gcloud compute firewall-rules create allow-migration-egress --allow=all --destination-ranges=0.0.0.0/0 \
+--direction=EGRESS --network=$VPC_NAME --priority=100
+gcloud compute firewall-rules delete allow-migration-egress
+
+gcloud compute firewall-rules create allow-migration-http-ingress --allow=tcp:80,tcp:443 --source-ranges=0.0.0.0/0 \
+--direction=INGRESS --network=$VPC_NAME --priority=101
+#gcloud compute firewall-rules delete allow-migration-http-ingress
+
+gcloud compute firewall-rules create allow-migration-ssh --allow=tcp:22 --source-ranges=0.0.0.0/0 \
+--direction=INGRESS --network=$VPC_NAME --priority=102
+#gcloud compute firewall-rules delete allow-migration-ssh
+
+gcloud compute firewall-rules create allow-azure-vpn-conn --allow=tcp --source-ranges=10.20.0.0/24 \
+--direction=INGRESS --network=$VPC_NAME --priority=103
+#gcloud compute firewall-rules delete allow-azure-vpn-conn
+
+gcloud compute firewall-rules create allow-migration-gcp-health-check --network=$VPC_NAME \
+--action=allow --direction=INGRESS --source-ranges=130.211.0.0/22,35.191.0.0/16 \
+--rules=tcp --priority=104
+#gcloud compute firewall-rules delete allow-migration-gcp-health-check
+
+gcloud compute firewall-rules  list --format="table(name, network)" --filter="network=$VPC_NAME"
+
+Classic VPN Gateway
+====================================
+gcloud compute addresses create $CLASSIC_VPN_GATEWAY_IP_NAME
+gcloud compute addresses describe $CLASSIC_VPN_GATEWAY_IP_NAME --format="get(address)"
+#gcloud compute addresses delete $CLASSIC_VPN_GATEWAY_IP_NAME
+
+gcloud compute target-vpn-gateways create $CLASSIC_VPN_GATEWAY_NAME --network $VPC_NAME
+#gcloud compute target-vpn-gateways delete $CLASSIC_VPN_GATEWAY_NAME
+
+gcloud compute forwarding-rules create vpn-1-rule-esp \
+--address=$(gcloud compute addresses describe $CLASSIC_VPN_GATEWAY_IP_NAME --format="get(address)") \
+--ip-protocol=ESP --target-vpn-gateway=$CLASSIC_VPN_GATEWAY_NAME
+
+gcloud compute forwarding-rules create vpn-1-rule-udp500 \
+--address=$(gcloud compute addresses describe $CLASSIC_VPN_GATEWAY_IP_NAME --format="get(address)") \
+--ip-protocol=UDP --ports=500 --target-vpn-gateway=$CLASSIC_VPN_GATEWAY_NAME
+
+gcloud compute forwarding-rules create vpn-1-rule-udp4500 \
+--address=$(gcloud compute addresses describe $CLASSIC_VPN_GATEWAY_IP_NAME --format="get(address)") \
+--ip-protocol=UDP --ports=4500 --target-vpn-gateway=$CLASSIC_VPN_GATEWAY_NAME
+
+gcloud compute vpn-tunnels create $CLASSIC_TUNNEL_NAME_IF0 --peer-address=$AZURE_GW_IP_0 --shared-secret=$SHARED_SECRET \
+--ike-version=$IKE_VERS --local-traffic-selector=0.0.0.0/0 --remote-traffic-selector=0.0.0.0/0 \
+--target-vpn-gateway=$CLASSIC_VPN_GATEWAY_NAME
+
+gcloud compute routes create $CLASSIC_TUNNEL_ROUTE0 --network=$VPC_NAME --priority=100 \
+--destination-range=$AZURE_SUBNET_IP_RANGE0 --next-hop-vpn-tunnel=$CLASSIC_TUNNEL_NAME_IF0
+
+gcloud compute instances create $TEST_VPN_VM \
+--zone=$REGION-a --machine-type=n2d-standard-2 \
+--image-family=ubuntu-2204-lts --image-project=ubuntu-os-cloud \
+--network=$VPC_NAME --subnet=$MIGRATION_SUBNET \
+--scopes=https://www.googleapis.com/auth/cloud-platform
+
+gcloud compute ssh $TEST_VPN_VM --zone=$REGION-a
+
+
+HA VPN Gateway
+====================================
+gcloud compute vpn-gateways create $HA_VPN_GATEWAY_NAME --network $VPC_NAME
+#gcloud compute vpn-gateways delete $HA_VPN_GATEWAY_NAME
+
+gcloud compute routers create $HA_VPN_ROUTER_NAME --network $VPC_NAME --asn $HA_VPN_GOOGLE_ASN
+#gcloud compute routers delete $HA_VPN_ROUTER_NAME
+
+gcloud compute external-vpn-gateways create $HA_VPN_AZURE_GW_NAME --interfaces 0=$HA_VPN_AZURE_GW_IP_0,1=$HA_VPN_AZURE_GW_IP_1
+#gcloud compute external-vpn-gateways delete $HA_VPN_AZURE_GW_NAME
+
+gcloud compute vpn-tunnels create $HA_VPN_TUNNEL_NAME_IF0  --ike-version=$IKE_VERS \
+--peer-external-gateway=$HA_VPN_AZURE_GW_NAME --peer-external-gateway-interface=0  \
+--shared-secret=$SHARED_SECRET --router=$HA_VPN_ROUTER_NAME --vpn-gateway=$HA_VPN_GATEWAY_NAME --interface=0
+#gcloud compute vpn-tunnels delete $HA_VPN_TUNNEL_NAME_IF0
+
+gcloud compute routers add-interface $HA_VPN_ROUTER_NAME --interface-name=$HA_VPN_ROUTER_NAME_TUNNEL0 \
+--mask-length=$MASK_LENGTH --vpn-tunnel=$HA_VPN_TUNNEL_NAME_IF0 --ip-address=$HA_VPN_GOOGLE_BGP_IP_0
+#gcloud compute routers remove-interface $HA_VPN_ROUTER_NAME --interface-name=$HA_VPN_ROUTER_NAME_TUNNEL0
+
+gcloud compute routers add-bgp-peer $HA_VPN_ROUTER_NAME --peer-name=$HA_VPN_BGP_PEER_NAME_0 --peer-asn=$HA_VPN_AZURE_ASN \
+--interface=$HA_VPN_ROUTER_NAME_TUNNEL0 --peer-ip-address=$HA_VPN_AZURE_BGP_PERING_ADDRESS0 --region=$REGION
+#gcloud compute routers remove-bgp-peer $HA_VPN_ROUTER_NAME --peer-name=$HA_VPN_BGP_PEER_NAME_0
+
+
+
+gcloud compute vpn-tunnels create $HA_VPN_TUNNEL_NAME_IF1  --ike-version=$IKE_VERS \
+--peer-external-gateway=$HA_VPN_AZURE_GW_NAME --peer-external-gateway-interface=1  \
+--shared-secret=$SHARED_SECRET --router=$HA_VPN_ROUTER_NAME --vpn-gateway=$HA_VPN_GATEWAY_NAME --interface=1
+#gcloud compute vpn-tunnels delete $HA_VPN_TUNNEL_NAME_IF1
+
+gcloud compute routers add-interface $HA_VPN_ROUTER_NAME --interface-name=$HA_VPN_ROUTER_NAME_TUNNEL1 \
+--mask-length=$MASK_LENGTH --vpn-tunnel=$HA_VPN_TUNNEL_NAME_IF1 --ip-address=$HA_VPN_GOOGLE_BGP_IP_1
+#gcloud compute routers remove-interface $HA_VPN_ROUTER_NAME --interface-name=$HA_VPN_ROUTER_NAME_TUNNEL1
+
+gcloud compute routers add-bgp-peer $HA_VPN_ROUTER_NAME --peer-name=$HA_VPN_BGP_PEER_NAME_1 --peer-asn=$HA_VPN_AZURE_ASN \
+--interface=$HA_VPN_ROUTER_NAME_TUNNEL1 --peer-ip-address=$HA_VPN_AZURE_BGP_PERING_ADDRESS1 --region=$REGION
+#gcloud compute routers remove-bgp-peer $HA_VPN_ROUTER_NAME --peer-name=$HA_VPN_BGP_PEER_NAME_1
+
+#Storage Transfer of Filesystem from Azure to GCP
+============================================================
+#Setup Filestore instances
+==============================================
+#Setup Private Service Access
+===============================
+gcloud compute addresses create google-managed-services-$VPC_NAME \
+--global \
+--purpose=VPC_PEERING \
+--addresses=10.30.0.0 \
+--prefix-length=20 \
+--network=projects/$PROJECT_ID/global/networks/$VPC_NAME
+        
+gcloud services vpc-peerings connect --service=servicenetworking.googleapis.com \
+--ranges=google-managed-services-$VPC_NAME --network=$VPC_NAME --project=$PROJECT_ID
+
+gcloud compute networks peerings update servicenetworking-googleapis-com \
+--import-custom-routes --export-custom-routes --network=$VPC_NAME
+
+#Create new Filestore Instance
+====================================
+gcloud filestore instances create nfs-server --zone=$REGION-b --tier=ZONAL \
+--performance=max-iops-per-tb=17000 --file-share=name="nasmount",capacity=1TB \
+--network=name=$VPC_NAME,connect-mode=PRIVATE_SERVICE_ACCESS,reserved-ip-range=google-managed-services-$VPC_NAME
+
+#Enable Storage Transfer API
+====================================
+gcloud services enable storagetransfer.googleapis.com
+
+#Create Source and Destination Agent pools
+=============================================
+gcloud transfer agent-pools create $AZURE_AGENT_POOL
+gcloud transfer agent-pools create $GCP_AGENT_POOL
+
+##Setup Destination VM
+=========================
+gcloud compute ssh $TEST_VPN_VM --zone=$REGION-a
+GCP_AGENT_POOL=azure-gcp-dest-pool
+
+#Install Docker
+==================
+sudo apt-get update
+sudo apt-get install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo docker run hello-world
+sudo usermod -aG docker $USER
+sudo systemctl restart docker
+
+#Install Transfer Agent
+=================================
+gcloud transfer agents install --pool=$GCP_AGENT_POOL --count=1 --mount-directories=/mnt/vpn
+
+#Disconnect from Destination VM
+=================================
+exit;
+
+#Create Intermediary Storage Bucket
+==========================================
+gcloud storage buckets create gs://$PROJECT_ID-fstransfer-stg --location=$REGION
+
+#Grant the Storage Transfer Service service account the Storage Admin role (roles/storage.admin) for the bucket. (Recomemnded)
+#OR exec ute following command below (Not Recomemnded)
+==================================================================================================================================
+gcloud transfer authorize --add-missing
+
+#Create Intermediary Storage Bucket
+==========================================
+gcloud transfer jobs create posix:///home/azureuser/azgcpfs posix:///mnt/vpn \
+--source-agent-pool=$AZURE_AGENT_POOL --destination-agent-pool=$GCP_AGENT_POOL \
+--intermediate-storage-path=ggs://$PROJECT_ID-fstransfer-stg --schedule-repeats-every=1h
+#gcloud transfer jobs delete $AZURE_GCP_FS_TRANSFER
+
