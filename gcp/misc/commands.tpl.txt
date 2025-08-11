@@ -60,8 +60,8 @@ gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$GSA 
 gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$GSA --role=roles/iam.serviceAccountUser
 gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$GSA --role=roles/iam.serviceAccountTokenCreator
 
-gcloud iam service-accounts keys create $HELPERSRPATH/$GSA_DISPLAY_NAME.json --iam-account=$GSA
-gcloud auth activate-service-account $GSA --key-file=$HELPERSRPATH/$GSA_DISPLAY_NAME.json
+gcloud iam service-accounts keys create $SERVICE_ACCOUNT_FILE_PATH/$GSA_DISPLAY_NAME.json --iam-account=$GSA
+gcloud auth activate-service-account $GSA --key-file=$SERVICE_ACCOUNT_FILE_PATH/$GSA_DISPLAY_NAME.json
 #gcloud config set account $GSA
 gcloud auth list
 
@@ -74,32 +74,32 @@ Network
 gcloud compute networks create $VPC_NAME --subnet-mode=custom --bgp-routing-mode=regional --mtu=1460
 #gcloud compute networks delete $VPC_NAME
 
-gcloud compute networks subnets create $MIGRATION_SUBNET --network=$VPC_NAME \
+gcloud compute networks subnets create $VM_SUBNET --network=$VPC_NAME \
 --range=10.0.0.0/24 
-#gcloud compute networks subnets delete $MIGRATION_SUBNET
+#gcloud compute networks subnets delete $VM_SUBNET
 
 gcloud compute networks subnets list --network=$VPC_NAME
 
-gcloud compute firewall-rules create allow-migration-egress --allow=all --destination-ranges=0.0.0.0/0 \
+gcloud compute firewall-rules create allow-vpn-egress --allow=all --destination-ranges=0.0.0.0/0 \
 --direction=EGRESS --network=$VPC_NAME --priority=100
-gcloud compute firewall-rules delete allow-migration-egress
+gcloud compute firewall-rules delete allow-vpn-egress
 
-gcloud compute firewall-rules create allow-migration-http-ingress --allow=tcp:80,tcp:443 --source-ranges=0.0.0.0/0 \
+gcloud compute firewall-rules create allow-vpn-http-ingress --allow=tcp:80,tcp:443 --source-ranges=0.0.0.0/0 \
 --direction=INGRESS --network=$VPC_NAME --priority=101
-#gcloud compute firewall-rules delete allow-migration-http-ingress
+#gcloud compute firewall-rules delete allow-vpn-http-ingress
 
-gcloud compute firewall-rules create allow-migration-ssh --allow=tcp:22 --source-ranges=0.0.0.0/0 \
+gcloud compute firewall-rules create allow-vpn-ssh --allow=tcp:22 --source-ranges=0.0.0.0/0 \
 --direction=INGRESS --network=$VPC_NAME --priority=102
-#gcloud compute firewall-rules delete allow-migration-ssh
+#gcloud compute firewall-rules delete allow-vpn-ssh
 
 gcloud compute firewall-rules create allow-azure-vpn-conn --allow=tcp --source-ranges=10.20.0.0/24 \
 --direction=INGRESS --network=$VPC_NAME --priority=103
 #gcloud compute firewall-rules delete allow-azure-vpn-conn
 
-gcloud compute firewall-rules create allow-migration-gcp-health-check --network=$VPC_NAME \
+gcloud compute firewall-rules create allow-vpn-gcp-health-check --network=$VPC_NAME \
 --action=allow --direction=INGRESS --source-ranges=130.211.0.0/22,35.191.0.0/16 \
 --rules=tcp --priority=104
-#gcloud compute firewall-rules delete allow-migration-gcp-health-check
+#gcloud compute firewall-rules delete allow-vpn-gcp-health-check
 
 gcloud compute firewall-rules  list --format="table(name, network)" --filter="network=$VPC_NAME"
 
@@ -115,27 +115,33 @@ gcloud compute target-vpn-gateways create $CLASSIC_VPN_GATEWAY_NAME --network $V
 gcloud compute forwarding-rules create vpn-1-rule-esp \
 --address=$(gcloud compute addresses describe $CLASSIC_VPN_GATEWAY_IP_NAME --format="get(address)") \
 --ip-protocol=ESP --target-vpn-gateway=$CLASSIC_VPN_GATEWAY_NAME
+#gcloud compute forwarding-rules delete vpn-1-rule-esp
 
 gcloud compute forwarding-rules create vpn-1-rule-udp500 \
 --address=$(gcloud compute addresses describe $CLASSIC_VPN_GATEWAY_IP_NAME --format="get(address)") \
 --ip-protocol=UDP --ports=500 --target-vpn-gateway=$CLASSIC_VPN_GATEWAY_NAME
+#gcloud compute forwarding-rules delete vpn-1-rule-udp500
 
 gcloud compute forwarding-rules create vpn-1-rule-udp4500 \
 --address=$(gcloud compute addresses describe $CLASSIC_VPN_GATEWAY_IP_NAME --format="get(address)") \
 --ip-protocol=UDP --ports=4500 --target-vpn-gateway=$CLASSIC_VPN_GATEWAY_NAME
+#gcloud compute forwarding-rules delete vpn-1-rule-udp4500
 
 gcloud compute vpn-tunnels create $CLASSIC_TUNNEL_NAME_IF0 --peer-address=$AZURE_GW_IP_0 --shared-secret=$SHARED_SECRET \
 --ike-version=$IKE_VERS --local-traffic-selector=0.0.0.0/0 --remote-traffic-selector=0.0.0.0/0 \
 --target-vpn-gateway=$CLASSIC_VPN_GATEWAY_NAME
+#gcloud compute vpn-tunnels delete $CLASSIC_TUNNEL_NAME_IF0
 
 gcloud compute routes create $CLASSIC_TUNNEL_ROUTE0 --network=$VPC_NAME --priority=100 \
 --destination-range=$AZURE_SUBNET_IP_RANGE0 --next-hop-vpn-tunnel=$CLASSIC_TUNNEL_NAME_IF0
+#gcloud compute routes delete $CLASSIC_TUNNEL_ROUTE0
 
 gcloud compute instances create $TEST_VPN_VM \
 --zone=$REGION-a --machine-type=n2d-standard-2 \
 --image-family=ubuntu-2204-lts --image-project=ubuntu-os-cloud \
---network=$VPC_NAME --subnet=$MIGRATION_SUBNET \
+--network=$VPC_NAME --subnet=$VM_SUBNET \
 --scopes=https://www.googleapis.com/auth/cloud-platform
+#gcloud compute instances delete $TEST_VPN_VM
 
 gcloud compute ssh $TEST_VPN_VM --zone=$REGION-a
 
@@ -163,8 +169,6 @@ gcloud compute routers add-interface $HA_VPN_ROUTER_NAME --interface-name=$HA_VP
 gcloud compute routers add-bgp-peer $HA_VPN_ROUTER_NAME --peer-name=$HA_VPN_BGP_PEER_NAME_0 --peer-asn=$HA_VPN_AZURE_ASN \
 --interface=$HA_VPN_ROUTER_NAME_TUNNEL0 --peer-ip-address=$HA_VPN_AZURE_BGP_PERING_ADDRESS0 --region=$REGION
 #gcloud compute routers remove-bgp-peer $HA_VPN_ROUTER_NAME --peer-name=$HA_VPN_BGP_PEER_NAME_0
-
-
 
 gcloud compute vpn-tunnels create $HA_VPN_TUNNEL_NAME_IF1  --ike-version=$IKE_VERS \
 --peer-external-gateway=$HA_VPN_AZURE_GW_NAME --peer-external-gateway-interface=1  \
