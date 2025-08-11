@@ -1,7 +1,7 @@
 !.gitignore
 **/.DS_Store
 **/.env
-**/misc/**
+**/misc
 !**/misc/*.tpl.*
 **/node_modules
 **/package-lock.json
@@ -14,4 +14,5 @@
 **/manifests/vertexai
 **/k8s-gateway-api
 **/certs
+**/assets/images/backup
 
