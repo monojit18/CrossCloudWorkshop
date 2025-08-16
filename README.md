@@ -1,4 +1,4 @@
-# Seamlessly Connect Azure and GCP: Your Guide to VPN Gateway Configuration
+# Bridge the Clouds: A Practical Walkthrough for Connecting Azure and GCP
 
 ### Nomenclatures
 
@@ -26,7 +26,7 @@ This deep dive will cover:
 
 - **Configuring the GCP Cloud VPN Tunnel**: We'll detail the steps for setting up a Classic VPN on GCP, including creating the VPN gateway and peer gateway.
 
-- **Connecting the Two Environments**: This section will show you how to finalize the connection by specifying the public IP addresses and shared keys on both platforms.
+- **Connecting the Two Environments**: This section will show you how to finalise the connection by specifying the public IP addresses and shared keys on both platforms.
 
   
 
@@ -46,13 +46,13 @@ This guide aims to move beyond a basic overview, offering deep-dive examples and
 ## What it contains...
 
 - A Route-based Classic VPN setup between Azure and GCP with an example
-- A BGP-based Dunamic HA VPN setup between Azure and GCP with an example
+- A BGP-based Dynamic HA VPN setup between Azure and GCP with an example
 
 ## What it does not...
 
 - This document is not a tutorial on the general VPN process or the underlying concepts of virtual private networking. For foundational knowledge, please consult the [References](#References) section.
 
-- It does not serve as a tutorial for any of the specific GCP services or tools utilized in this solution. Users are expected to have a working knowledge of these components; please refer to the [References](#References) section.
+- It does not serve as a tutorial for any of the specific GCP services or tools utilised in this solution. Users are expected to have a working knowledge of these components; please refer to the [References](#References) section.
 
   
 
@@ -82,7 +82,7 @@ This guide aims to move beyond a basic overview, offering deep-dive examples and
 
 ### High Level Architecture
 
-![classic-vpn-arch](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/classic-vpn-arch.png)
+![classic-vpn-arch](./assets/images/classic-vpn-arch.png)
 
 ## Step-by-Step guide on Azure
 
@@ -158,9 +158,9 @@ az network vnet subnet create -n $CLASSIC_VPN_GATEWAY_SUBNET_NAME --address-pref
 #az network vnet subnet delete -n $CLASSIC_VPN_GATEWAY_SUBNET_NAME --vnet-name $CLASSIC_VPN_VNET_NAME -g $RESOURCE_GROUP
 ```
 
-![azure-classic-vpn-vnet](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-classic-vpn-vnet.png)
+![azure-classic-vpn-vnet](./assets/images/azure-classic-vpn-vnet.png)
 
-![azure-classic-vpn-subnet](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-classic-vpn-subnet.png)
+![azure-classic-vpn-subnet](./assets/images/azure-classic-vpn-subnet.png)
 
 ### Add Network Security Groups for the VNET
 
@@ -214,9 +214,9 @@ az network vnet-gateway list -g $RESOURCE_GROUP
 > - Azure VPN Gateway will be created with two public IP Addresses - **Public IP 1** and **Public IP 2**
 > - Please note these down as they would be needed later while setting up the VPN Gateway on the GCP side.
 
-![azure-classic-vpn-gw-overview](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-classic-vpn-gw-overview.png)
+![azure-classic-vpn-gw-overview](./assets/images/azure-classic-vpn-gw-overview.png)
 
-![azure-classic-vpn-gw-properties](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-classic-vpn-gw-properties.png)
+![azure-classic-vpn-gw-properties](./assets/images/azure-classic-vpn-gw-properties.png)
 
 ## Let's now shift our attention to GCP
 
@@ -374,11 +374,11 @@ gcloud compute routes create $CLASSIC_TUNNEL_ROUTE0 --network=$VPC_NAME --priori
 #gcloud compute routes delete $CLASSIC_TUNNEL_ROUTE0
 ```
 
-![gcp-classic-vpn-gw](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/gcp-classic-vpn-gw.png)
+![gcp-classic-vpn-gw](./assets/images/gcp-classic-vpn-gw.png)
 
-![gcp-classic-vpn-gw](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/gcp-all-vpn-gws-classic.png)
+![gcp-classic-vpn-gw](./assets/images/gcp-all-vpn-gws-classic.png)
 
-![gcp-classic-vpn-gw](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/gcp-classic-vpn-gw-tnl0.png)
+![gcp-classic-vpn-gw](./assets/images/gcp-classic-vpn-gw-tnl0.png)
 
 ### Setup the Test VM
 
@@ -400,7 +400,7 @@ sudo apt get nginx
 > [!NOTE]
 >
 > - We will use this Test VM to test end to end VPN connectivity between Azure and GCP.
-> - The VM ccan be of any configuration of your choide; above setup is just an example
+> - The VM can be of any configuration of your choice; above setup is just an example.
 
 
 
@@ -420,11 +420,11 @@ az network vpn-connection create --name $CLASSIC_VPN_CONNECTIN_NAME -g $RESOURCE
 #az network vpn-connection delete --name $CLASSIC_VPN_CONNECTIN_NAME -g $RESOURCE_GROUP
 ```
 
-![azure-classic-vpn-localgw-overview](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-classic-vpn-localgw-overview.png)
+![azure-classic-vpn-localgw-overview](./assets/images/azure-classic-vpn-localgw-overview.png)
 
-![azure-classic-vpn-localgw-overview](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-classic-vpn-localgw-config.png)
+![azure-classic-vpn-localgw-overview](./assets/images/azure-classic-vpn-localgw-config.png)
 
-![azure-classic-vpn-localgw-conn](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-classic-vpn-localgw-conn.png)
+![azure-classic-vpn-localgw-conn](./assets/images/azure-classic-vpn-localgw-conn.png)
 
 ### Setup the Test VM
 
@@ -445,13 +445,13 @@ sudo apt install apache2
 > [!NOTE]
 >
 > - We will use this Test VM to test end to end VPN connectivity between Azure and GCP.
-> - The VM ccan be of any configuration of your choide; above setup is just an example
+> - The VM can be of any configuration of your choice; above setup is just an example.
 
 
 
 ### How to test the setup end to end?
 
-![classic-vpn-example](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/classic-vpn-example.png)
+![classic-vpn-example](./assets/images/classic-vpn-example.png)
 
 #### In azure CLI
 
@@ -479,7 +479,7 @@ curl http://<AZURE_TEST_VM_IP>
 
 ### High Level Architecture
 
-![classic-vpn-arch](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/ha-vpn-arch.png)
+![classic-vpn-arch](./assets/images/ha-vpn-arch.png)
 
 ## Step-by-Step guide on Azure
 
@@ -606,15 +606,15 @@ az network vnet-gateway list -g $RESOURCE_GROUP -o table
 > - Azure VPN Gateway will be created with two public IP Addresses - **Public IP 1** and **Public IP 2**
 > - Please note these down as they would be needed later while setting up the VPN Gateway on the GCP side.
 
-![azure-ha-vpn-gw-overview](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-ha-vpn-gw-overview.png)
+![azure-ha-vpn-gw-overview](./assets/images/azure-ha-vpn-gw-overview.png)
 
-![azure-ha-vpn-localgw0-overview](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-ha-vpn-localgw0-overview.png)
+![azure-ha-vpn-localgw0-overview](./assets/images/azure-ha-vpn-localgw0-overview.png)
 
-![azure-ha-vpn-gw-conn0](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-ha-vpn-gw-conn0.png)
+![azure-ha-vpn-gw-conn0](./assets/images/azure-ha-vpn-gw-conn0.png)
 
-![azure-ha-vpn-localgw1-overview](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-ha-vpn-localgw1-overview.png)
+![azure-ha-vpn-localgw1-overview](./assets/images/azure-ha-vpn-localgw1-overview.png)
 
-![azure-ha-vpn-gw-conn1](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/azure-ha-vpn-gw-conn1.png)
+![azure-ha-vpn-gw-conn1](./assets/images/azure-ha-vpn-gw-conn1.png)
 
 ## Let's now shift our attention to GCP
 
@@ -786,9 +786,9 @@ gcloud compute routers add-bgp-peer $HA_VPN_ROUTER_NAME --peer-name=$HA_VPN_BGP_
 #gcloud compute routers remove-bgp-peer $HA_VPN_ROUTER_NAME --peer-name=$HA_VPN_BGP_PEER_NAME_1
 ```
 
-![gcp-ha-vpn-gw](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/gcp-ha-vpn-gw.png)
+![gcp-ha-vpn-gw](./assets/images/gcp-ha-vpn-gw.png)
 
-![gcp-ha-peer-vpn-gw](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/gcp-ha-peer-vpn-gw.png)
+![gcp-ha-peer-vpn-gw](./assets/images/gcp-ha-peer-vpn-gw.png)
 
 ### Setup the Test VM
 
@@ -810,7 +810,7 @@ sudo apt get nginx
 > [!NOTE]
 >
 > - We will use this Test VM to test end to end VPN connectivity between Azure and GCP.
-> - The VM can be of any configuration of your choice; above setup is just an example
+> - The VM can be of any configuration of your choice; above setup is just an example.
 
 
 
@@ -858,13 +858,13 @@ sudo apt install apache2
 > [!NOTE]
 >
 > - We will use this Test VM to test end to end VPN connectivity between Azure and GCP.
-> - The VM can be of any configuration of your choice; above setup is just an example
+> - The VM can be of any configuration of your choice; above setup is just an example.
 
 
 
 ### How to test the setup end to end?
 
-![ha-vpn-example](/Users/monojitd/Workloads/Development/Projects/GithubProjects/Workshops/CrossCloudWorkshop/assets/images/ha-vpn-example.png)
+![ha-vpn-example](./assets/images/ha-vpn-example.png)
 
 #### In azure CLI
 
